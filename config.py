@@ -9,7 +9,7 @@ from models.utils import duration_seconds, h2s
 # ------------------------
 BUILDING_FLOORS = 15  # 总楼层数 / total number of floors
 BUILDING_FLOOR_HEIGHT = 3.5  # 单层高度 (m) / floor height in meters
-ELEVATOR_COUNT = 5  # 电梯数量 / number of elevators
+ELEVATOR_COUNT = 4  # 电梯数量 / number of elevators
 ELEVATOR_CAPACITY = 1200.0  # 额定载荷 (kg) / rated payload
 
 # ------------------------

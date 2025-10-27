@@ -214,7 +214,9 @@ def plot_elevator_movements_time(
                 append_point(dropoff_time, req.destination)
 
         xs, ys = zip(*timeline)
-        plt.plot(xs, ys, color=color, linewidth=1.6, alpha=0.9, label=f"Elevator {elev.id}")
+        plt.plot(
+            xs, ys, color=color, linewidth=1.6, alpha=0.9, label=f"Elevator {elev.id}"
+        )
         plt.scatter(xs, ys, color=color, s=12)
 
     plt.xlabel("Time of Day")
