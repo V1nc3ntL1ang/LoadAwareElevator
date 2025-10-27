@@ -1,20 +1,18 @@
-from models.request import generate_requests_aday
-from models.variables import ElevatorState
 from models.baseline import assign_requests_baseline, simulate_baseline
 from models.objective import compute_objective
+from models.request import generate_requests_day
 from models.utils import (
+    log_results_to_file,
     plot_elevator_movements,
     print_elevator_queues,
-    log_results_to_file,
 )
+from models.variables import ElevatorState
 import config as cfg
-
-SIM_NUM_REQUESTS = 1000
 
 
 def main():
     # 1. 生成请求
-    requests = generate_requests_aday(SIM_NUM_REQUESTS)
+    requests = generate_requests_day(cfg.SIM_TOTAL_REQUESTS)
 
     # 2. 初始化电梯
     elevators = [ElevatorState(id=k + 1, floor=1) for k in range(cfg.ELEVATOR_COUNT)]
@@ -26,8 +24,12 @@ def main():
 
     # 4. 输出与可视化
     print_elevator_queues(elevators)
-    log_results_to_file(elevators, total_time, total_energy, total_cost)
-    plot_elevator_movements(elevators)
+
+    if cfg.SIM_ENABLE_LOG:
+        log_results_to_file(elevators, total_time, total_energy, total_cost)
+
+    if cfg.SIM_ENABLE_PLOTS:
+        plot_elevator_movements(elevators)
 
     print(
         f"Total Time: {total_time:.2f}s | "

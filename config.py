@@ -2,6 +2,8 @@
 # Load-Aware Elevator Scheduling — Configuration File
 # ============================================================
 
+from models.utils import duration_seconds, h2s
+
 # ------------------------
 # Building Parameters
 # ------------------------
@@ -48,6 +50,9 @@ ENERGY_STANDBY_POWER = 500.0
 SIM_TIME_HORIZON = 300
 SIM_TIME_STEP = 1.0
 SIM_RANDOM_SEED = 42
+SIM_TOTAL_REQUESTS = 1000
+SIM_ENABLE_PLOTS = False
+SIM_ENABLE_LOG = True
 
 # ------------------------
 # Request Generation Parameters
@@ -73,59 +78,91 @@ WEIGHT_ENERGY = 0.001
 
 
 # ============================================================
-# Load-Aware Elevator Scheduling — Configuration File
+# Request Generation Parameters
 # ============================================================
 
-# ------------------------
-# Building Parameters
-# ------------------------
-BUILDING_FLOORS = 15
-BUILDING_ELEVATORS = 4
-BUILDING_FLOOR_HEIGHT = 3.5  # meters
 
 # ------------------------
-# Simulation Parameters
-# ------------------------
-SIM_RANDOM_SEED = 42
-SIM_TIME_HORIZON = 300  # 单段仿真时间（秒）
-DAY_DURATION = 24 * 3600  # 一天（秒）
-
-# ------------------------
-# Request Generation — Common
+# 通用控制项
 # ------------------------
 DEFAULT_LOAD_MIN = 50
 DEFAULT_LOAD_MAX = 110
 DEFAULT_SIGMA_RATIO = 0.05
-DEFAULT_MAINFLOW_RATIO = 0.8
 DEFAULT_INTENSITY = 1.0
 
-# ------------------------
-# Off-Peak Parameters
-# ------------------------
-OFFPEAK_INTENSITY = 0.4  # 人流强度相对高峰
-OFFPEAK_MAINFLOW_RATIO = 0.8  # 一楼相关请求比例
+# ============================================================
+# 1. 平峰参数 (Uniform Distribution)
+# ============================================================
+
+OFFPEAK_INTENSITY = 0.4  # 平峰人流强度（相对高峰）
 OFFPEAK_LOAD_MIN = 50
 OFFPEAK_LOAD_MAX = 110
 
-# ------------------------
-# Peak Parameters
-# ------------------------
-PEAK_INTENSITY = 1.0  # 相对人流强度（标准化为1）
-PEAK_MAINFLOW_RATIO = 0.95  # 主流方向比例（早高峰下行，晚高峰上行）
+# 三个比例之和应为 1：
+OFFPEAK_RATIO_ORIGIN1 = 0.45  # 从一楼出发（上行）
+OFFPEAK_RATIO_DEST1 = 0.45  # 到一楼（下行）
+OFFPEAK_RATIO_OTHER = 0.10  # 楼层间流动（上下均可）
+
+# ============================================================
+# 2. 高峰参数 (Gaussian Distribution)
+# ============================================================
+
+PEAK_INTENSITY = 1.0
 PEAK_LOAD_MIN = 60
 PEAK_LOAD_MAX = 150
-PEAK_SIGMA_RATIO = 0.05  # 时间集中程度 (σ)
+PEAK_SIGMA_RATIO = 0.05  # 时间分布尖锐程度（越小越集中）
 
-# ------------------------
-# Daytime Ratio (sum ≈ 1.0)
-# ------------------------
-PEAK_MORNING_RATIO = 0.25
-OFFPEAK_DAY_RATIO = 0.35
-PEAK_EVENING_RATIO = 0.25
-OFFPEAK_NIGHT_RATIO = 0.15
+# ---- 早高峰 (morning peak)
+PEAK_MORNING_RATIO_ORIGIN1 = 0.05  # 少数从一楼出发（上行）
+PEAK_MORNING_RATIO_DEST1 = 0.90  # 多数到一楼（下行）
+PEAK_MORNING_RATIO_OTHER = 0.05  # 少量楼层间流动
 
-# ------------------------
-# Peak time centers (as ratio of 24h)
-# ------------------------
-PEAK_MORNING_MU_RATIO = 0.08  # ≈ 07:40
-PEAK_EVENING_MU_RATIO = 0.75  # ≈ 18:00
+# ---- 晚高峰 (evening peak)
+PEAK_EVENING_RATIO_ORIGIN1 = 0.90  # 多数从一楼出发（上行）
+PEAK_EVENING_RATIO_DEST1 = 0.05  # 少数到一楼（下行）
+PEAK_EVENING_RATIO_OTHER = 0.05  # 少量楼层间流动
+
+# ============================================================
+# 3. 时段时间定义（支持小时:分钟）
+# ============================================================
+
+# 早高峰 7:00–9:00
+PEAK_MORNING_START = (8, 0)
+PEAK_MORNING_END = (9, 0)
+
+# 白天平峰 9:00–17:00
+OFFPEAK_DAY_START = (9, 0)
+OFFPEAK_DAY_END = (17, 0)
+
+# 晚高峰 17:00–21:00
+PEAK_EVENING_START = (17, 0)
+PEAK_EVENING_END = (21, 0)
+
+# 夜间平峰 21:00–次日7:00（跨日）
+OFFPEAK_NIGHT_START = (21, 0)
+OFFPEAK_NIGHT_END = (7 + 24, 0)  # 次日 7:00 = 31 小时
+
+# 高峰中心
+PEAK_MORNING_MU = "8:30"
+PEAK_EVENING_MU = "18:00"
+
+# ============================================================
+# 自动计算各时段比例（无需手动修改）
+# ============================================================
+
+DAY_DURATION = 24 * 3600  # 一天总秒数
+
+
+# 各时段长度
+_duration_morning = duration_seconds(PEAK_MORNING_START, PEAK_MORNING_END)
+_duration_day = duration_seconds(OFFPEAK_DAY_START, OFFPEAK_DAY_END)
+_duration_evening = duration_seconds(PEAK_EVENING_START, PEAK_EVENING_END)
+_duration_night = duration_seconds(OFFPEAK_NIGHT_START, OFFPEAK_NIGHT_END)
+
+_total = _duration_morning + _duration_day + _duration_evening + _duration_night
+
+# 自动计算比例
+PEAK_MORNING_RATIO = _duration_morning / _total
+OFFPEAK_DAY_RATIO = _duration_day / _total
+PEAK_EVENING_RATIO = _duration_evening / _total
+OFFPEAK_NIGHT_RATIO = _duration_night / _total

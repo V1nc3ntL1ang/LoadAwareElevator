@@ -1,150 +1,163 @@
 import random
 import config as cfg
+from models.utils import rand_other_pair, rand_upper_floor, validate_ratios
 from models.variables import Request
 
 
-# ============================================================
-# 基础生成函数
-# ============================================================
-
-
+# ------------------------------
+# Off-peak: 时间均匀分布
+# ------------------------------
 def generate_offpeak_uniform(
     num_requests: int,
     start_time: float,
     end_time: float,
-    intensity: float = cfg.OFFPEAK_INTENSITY,
-    mainflow_ratio: float = cfg.OFFPEAK_MAINFLOW_RATIO,
-    load_min: float = cfg.OFFPEAK_LOAD_MIN,
-    load_max: float = cfg.OFFPEAK_LOAD_MAX,
+    *,
+    intensity: float = 1.0,
+    ratio_origin1: float = 0.5,
+    ratio_dest1: float = 0.5,
+    ratio_other: float = 0.0,
+    load_min: float = 50.0,
+    load_max: float = 110.0,
+    seed_offset: int = 0,
 ):
     """
-    Generate requests during off-peak hours with uniform time distribution.
-    - 时间分布均匀
-    - 控制一楼相关比例(mainflow_ratio)
-    - 强度intensity可缩放请求数量
+    生成平峰请求：时间在 [start_time, end_time] 均匀分布。
+    三个比例定义方向与是否涉及 1 楼：
+      - ratio_origin1：origin=1, dest∈[2..F]
+      - ratio_dest1  ：origin∈[2..F], dest=1
+      - ratio_other  ：origin,dest∈[2..F], 且 origin!=dest
+    intensity 用于人数缩放：实际生成数量 = floor(num_requests * intensity)
     """
-    random.seed(cfg.SIM_RANDOM_SEED)
-    n_requests = int(num_requests * intensity)
-    requests = []
+    random.seed(cfg.SIM_RANDOM_SEED + seed_offset)
+    n = max(0, int(num_requests * max(0.0, intensity)))
+    c1, c2 = validate_ratios(ratio_origin1, ratio_dest1, ratio_other)
 
-    for i in range(n_requests):
-        # 一楼相关流向
-        if random.random() < mainflow_ratio:
-            if random.random() < 0.5:
-                origin, destination = 1, random.randint(2, cfg.BUILDING_FLOORS)
-            else:
-                origin, destination = random.randint(2, cfg.BUILDING_FLOORS), 1
+    reqs = []
+    for i in range(n):
+        u = random.random()
+        if u < c1:
+            origin, destination = 1, rand_upper_floor(cfg.BUILDING_FLOORS)
+        elif u < c2:
+            origin, destination = rand_upper_floor(cfg.BUILDING_FLOORS), 1
         else:
-            # 楼层间移动
-            origin = random.randint(2, cfg.BUILDING_FLOORS)
-            destination = random.randint(2, cfg.BUILDING_FLOORS)
-            while destination == origin:
-                destination = random.randint(2, cfg.BUILDING_FLOORS)
+            origin, destination = rand_other_pair(cfg.BUILDING_FLOORS)
 
         load = random.uniform(load_min, load_max)
-        arrival_time = random.uniform(start_time, end_time)
+        arrival = random.uniform(start_time, end_time)
+        reqs.append(Request(i + 1, origin, destination, load, arrival))
 
-        requests.append(Request(i + 1, origin, destination, load, arrival_time))
-
-    return requests
+    return reqs
 
 
+# ------------------------------
+# Peak: 时间正态分布
+# ------------------------------
 def generate_peak_gaussian(
     num_requests: int,
     start_time: float,
     end_time: float,
-    peak_type: str = "morning",
-    intensity: float = cfg.PEAK_INTENSITY,
-    mainflow_ratio: float = cfg.PEAK_MAINFLOW_RATIO,
-    load_min: float = cfg.PEAK_LOAD_MIN,
-    load_max: float = cfg.PEAK_LOAD_MAX,
-    sigma_ratio: float = cfg.PEAK_SIGMA_RATIO,
+    *,
+    mu_time: float,
+    sigma_ratio: float = 0.05,
+    intensity: float = 1.0,
+    ratio_origin1: float = 0.5,
+    ratio_dest1: float = 0.5,
+    ratio_other: float = 0.0,
+    load_min: float = 60.0,
+    load_max: float = 150.0,
+    seed_offset: int = 100,
 ):
     """
-    Generate requests during peak hours with Gaussian time distribution.
-    - 时间呈正态分布
-    - 支持方向比例(mainflow_ratio)
+    生成高峰请求：时间在 [start_time, end_time] 上服从截断高斯分布。
+    其它参数同上；sigma = (end-start) * sigma_ratio。
     """
-    random.seed(cfg.SIM_RANDOM_SEED + (1 if peak_type == "evening" else 0))
-    n_requests = int(num_requests * intensity)
-    requests = []
+    random.seed(cfg.SIM_RANDOM_SEED + seed_offset)
+    n = max(0, int(num_requests * max(0.0, intensity)))
+    c1, c2 = validate_ratios(ratio_origin1, ratio_dest1, ratio_other)
 
-    mu_ratio = (
-        cfg.PEAK_MORNING_MU_RATIO
-        if peak_type == "morning"
-        else cfg.PEAK_EVENING_MU_RATIO
-    )
-    mu_time = mu_ratio * cfg.DAY_DURATION
+    width = max(1e-6, (end_time - start_time))
+    sigma = max(1e-9, width * max(0.0, sigma_ratio))
 
-    for i in range(n_requests):
-        # 生成方向
-        if peak_type == "morning":
-            # 主流下行
-            if random.random() < mainflow_ratio:
-                origin = random.randint(2, cfg.BUILDING_FLOORS)
-                destination = 1
-            else:
-                origin = 1
-                destination = random.randint(2, cfg.BUILDING_FLOORS)
+    reqs = []
+    for i in range(n):
+        u = random.random()
+        if u < c1:
+            origin, destination = 1, rand_upper_floor(cfg.BUILDING_FLOORS)
+        elif u < c2:
+            origin, destination = rand_upper_floor(cfg.BUILDING_FLOORS), 1
         else:
-            # 主流上行
-            if random.random() < mainflow_ratio:
-                origin = 1
-                destination = random.randint(2, cfg.BUILDING_FLOORS)
-            else:
-                origin = random.randint(2, cfg.BUILDING_FLOORS)
-                destination = 1
+            origin, destination = rand_other_pair(cfg.BUILDING_FLOORS)
 
         load = random.uniform(load_min, load_max)
+        t = random.gauss(mu_time, sigma)
+        t = min(max(t, start_time), end_time)
+        reqs.append(Request(i + 1, origin, destination, load, t))
 
-        arrival_time = random.gauss(mu=mu_time, sigma=cfg.DAY_DURATION * sigma_ratio)
-        arrival_time = max(start_time, min(arrival_time, end_time))
-
-        requests.append(Request(i + 1, origin, destination, load, arrival_time))
-
-    return requests
+    return reqs
 
 
-# ============================================================
-# 一天模拟函数
-# ============================================================
+def generate_requests_day(total_requests: int):
+    """Simulate one full day of elevator requests."""
+    total_morning = int(total_requests * cfg.PEAK_MORNING_RATIO)
+    total_day = int(total_requests * cfg.OFFPEAK_DAY_RATIO)
+    total_evening = int(total_requests * cfg.PEAK_EVENING_RATIO)
+    total_night = int(total_requests * cfg.OFFPEAK_NIGHT_RATIO)
 
-
-def generate_requests_aday(total_requests: int):
-    """
-    Generate all requests for one day by combining peak and off-peak periods.
-    """
-    requests = []
-
-    # ---- 1. 各时段请求数 ----
-    n_morning = int(total_requests * cfg.PEAK_MORNING_RATIO)
-    n_day = int(total_requests * cfg.OFFPEAK_DAY_RATIO)
-    n_evening = int(total_requests * cfg.PEAK_EVENING_RATIO)
-    n_night = int(total_requests * cfg.OFFPEAK_NIGHT_RATIO)
-
-    # ---- 2. 时间范围 (秒) ----
-    def to_sec(h):
-        return h * 3600
-
-    # 早高峰 7:00–9:00
-    requests += generate_peak_gaussian(
-        n_morning, to_sec(7), to_sec(9), peak_type="morning"
+    morning = generate_peak_gaussian(
+        num_requests=total_morning,
+        start_time=cfg.h2s(*cfg.PEAK_MORNING_START),
+        end_time=cfg.h2s(*cfg.PEAK_MORNING_END),
+        mu_time=cfg.h2s(cfg.PEAK_MORNING_MU),
+        sigma_ratio=cfg.PEAK_SIGMA_RATIO,
+        intensity=cfg.PEAK_INTENSITY,
+        ratio_origin1=cfg.PEAK_MORNING_RATIO_ORIGIN1,
+        ratio_dest1=cfg.PEAK_MORNING_RATIO_DEST1,
+        ratio_other=cfg.PEAK_MORNING_RATIO_OTHER,
+        load_min=cfg.PEAK_LOAD_MIN,
+        load_max=cfg.PEAK_LOAD_MAX,
+        seed_offset=100,
     )
 
-    # 白天平峰 9:00–17:00
-    requests += generate_offpeak_uniform(
-        n_day, to_sec(9), to_sec(17), intensity=cfg.OFFPEAK_INTENSITY
+    day = generate_offpeak_uniform(
+        num_requests=total_day,
+        start_time=cfg.h2s(*cfg.OFFPEAK_DAY_START),
+        end_time=cfg.h2s(*cfg.OFFPEAK_DAY_END),
+        intensity=cfg.OFFPEAK_INTENSITY,
+        ratio_origin1=cfg.OFFPEAK_RATIO_ORIGIN1,
+        ratio_dest1=cfg.OFFPEAK_RATIO_DEST1,
+        ratio_other=cfg.OFFPEAK_RATIO_OTHER,
+        load_min=cfg.OFFPEAK_LOAD_MIN,
+        load_max=cfg.OFFPEAK_LOAD_MAX,
+        seed_offset=200,
     )
 
-    # 晚高峰 17:00–21:00
-    requests += generate_peak_gaussian(
-        n_evening, to_sec(17), to_sec(21), peak_type="evening"
+    evening = generate_peak_gaussian(
+        num_requests=total_evening,
+        start_time=cfg.h2s(*cfg.PEAK_EVENING_START),
+        end_time=cfg.h2s(*cfg.PEAK_EVENING_END),
+        mu_time=cfg.h2s(cfg.PEAK_EVENING_MU),
+        sigma_ratio=cfg.PEAK_SIGMA_RATIO,
+        intensity=cfg.PEAK_INTENSITY,
+        ratio_origin1=cfg.PEAK_EVENING_RATIO_ORIGIN1,
+        ratio_dest1=cfg.PEAK_EVENING_RATIO_DEST1,
+        ratio_other=cfg.PEAK_EVENING_RATIO_OTHER,
+        load_min=cfg.PEAK_LOAD_MIN,
+        load_max=cfg.PEAK_LOAD_MAX,
+        seed_offset=300,
     )
 
-    # 夜间平峰 21:00–次日7:00
-    requests += generate_offpeak_uniform(
-        n_night, to_sec(21), to_sec(31), intensity=cfg.OFFPEAK_INTENSITY
+    night = generate_offpeak_uniform(
+        num_requests=total_night,
+        start_time=cfg.h2s(*cfg.OFFPEAK_NIGHT_START),
+        end_time=cfg.h2s(*cfg.OFFPEAK_NIGHT_END),
+        intensity=cfg.OFFPEAK_INTENSITY,
+        ratio_origin1=cfg.OFFPEAK_RATIO_ORIGIN1,
+        ratio_dest1=cfg.OFFPEAK_RATIO_DEST1,
+        ratio_other=cfg.OFFPEAK_RATIO_OTHER,
+        load_min=cfg.OFFPEAK_LOAD_MIN,
+        load_max=cfg.OFFPEAK_LOAD_MAX,
+        seed_offset=400,
     )
 
-    requests.sort(key=lambda r: r.arrival_time)
+    requests = sorted(morning + day + evening + night, key=lambda r: r.arrival_time)
     return requests
