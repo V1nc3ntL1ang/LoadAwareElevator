@@ -361,8 +361,8 @@ def log_results(
         f.write(f"Total Requests: {len(all_requests)}\n\n")
 
         header = (
-            "ReqID | Elevator | Origin→Dest | Load(kg) | Arrive(s) | OrigArr(s) | "
-            "Pickup(s) | DestArr(s) | Complete(s) | Wait(s) | Onboard(s) | Total(s)\n"
+            "ReqID | Elevator | Origin→Dest | Load(kg) | Start(s) | ElevArr(s) | "
+            "Board(s) | DestArr(s) | Complete(s) | WaitQ(s) | InCab(s) | Total(s)\n"
         )
         f.write(header)
         f.write("-" * len(header) + "\n")

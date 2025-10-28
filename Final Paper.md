@@ -135,7 +135,9 @@ The elevator dispatching problem aims to minimize passenger waiting time, riding
 ##### Queueing and Service Assumptions
 
 -   **Queueing discipline.**  
-    At each floor $f$, entities form a **first come first served (FCFS)** queue across elevators:
+    At each floor $f$, entities form a **first come first served (FCFS)** queue
+    within each elevator’s assigned queue at that floor (i.e., FCFS is enforced
+    per-elevator after assignment rather than globally across elevators):
 
     -   if two requests arrive at the same floor $f$ with $T_{c_1}^{\mathrm{arrival}} < T_{c_2}^{\mathrm{arrival}}$, then $T_{c_1}^{\mathrm{pickup}} \le T_{c_2}^{\mathrm{pickup}}$.
     -   Each entity is indivisible: it either boards fully or waits; splitting is not allowed.
@@ -200,6 +202,74 @@ The elevator dispatching problem aims to minimize passenger waiting time, riding
 -   $\mathcal{M}:=\{\text{acc},\text{dec}\}$: motion modes (acceleration, deceleration)
 
 ---
+
+##### Request Model
+
+-   Periods and allocation (sets and weights):
+
+    -   Let the periods be $\mathcal J=\{m,d,e,n\}$ for morning/day/evening/night with
+        intervals $[s_j,e_j]$ and durations $D_j:=e_j-s_j$ (cross-day adjusted).
+        Define shares $r_j:=\dfrac{D_j}{\sum_{\ell\in\mathcal J} D_\ell}$.
+        Given a full-day target $N$, allocate
+        $$
+        N_j = \big\lfloor N\, r_j \big\rfloor,\qquad
+        n_j = \big\lfloor N_j\, I_j \big\rfloor,
+        $$
+        where $I_j$ is the period-specific intensity.
+
+-   Arrival-time sampling (continuous-time, event-driven):
+
+    -   Off-peak ($j\in\{d,n\}$):
+        $$
+        t\;\sim\;\mathrm{Uniform}\,[s_j, e_j].
+        $$
+    -   Peak ($j\in\{m,e\}$): truncated Gaussian on $[s_j,e_j]$ with
+        mean $\mu_j$ and $\sigma_j = (e_j-s_j)\,\sigma^{\text{ratio}}_j$.
+        The PDF is
+        $$
+        f_{\mathrm{TN}}(t)\;=\;\frac{\varphi\!\big(\tfrac{t-\mu_j}{\sigma_j}\big)}{\sigma_j\,\big[\Phi\!\big(\tfrac{e_j-\mu_j}{\sigma_j}\big)-\Phi\!\big(\tfrac{s_j-\mu_j}{\sigma_j}\big)\big]}
+        ,\quad t\in[s_j,e_j],
+        $$
+        where $\varphi$/$\Phi$ are the standard normal PDF/CDF.
+
+-   Origin–destination composition (segment-specific):
+
+    -   Let $\boldsymbol{\pi}^j=(\pi^{j}_{o1},\,\pi^{j}_{d1},\,\pi^{j}_{\mathrm{other}})$ with
+        $\sum \pi^j=1$. Then
+        $$
+        \begin{aligned}
+        &\mathbb P\big(o=1,\ d\in\{2,\dots,F\}\big) = \pi^{j}_{o1}\,\frac{1}{F-1},\\
+        &\mathbb P\big(o\in\{2,\dots,F\},\ d=1\big) = \pi^{j}_{d1}\,\frac{1}{F-1},\\
+        &\mathbb P\big(o,d\in\{2,\dots,F\},\ o\ne d\big) = \pi^{j}_{\mathrm{other}}\,\frac{1}{(F-1)(F-2)}.
+        \end{aligned}
+        $$
+
+-   **Load model (segment-specific bounded uniform)**  
+    For request \( c \) in period \( j \):
+
+    $$
+    L_c \sim \mathcal{U}\!\big[w_{\min}^{(j)},\, w_{\max}^{(j)}\big].
+    $$
+
+-   **Merge and reindex**  
+    Concatenate \(\{n*j\}*{j\in\mathcal{J}}\) requests, sort by arrival time,  
+    then reindex \(\mathrm{ID}\_c = 1, 2, \dots\) to ensure uniqueness.
+
+-   **Reproducibility**  
+    A global seed with period-specific offsets ensures reproducible draws per period.
+
+---
+
+### Time stamps and derived metrics
+
+-   **\(T_c^{\mathrm{arr}}\)** — passenger arrival (start waiting)
+-   **\(T_c^{\mathrm{elev}}\)** — elevator arrival at origin (before boarding)
+-   **\(T_c^{\mathrm{pick}}\)** — boarding complete (origin dwell end)
+-   **\(T_c^{\mathrm{dest}}\)** — destination arrival (drop-off instantaneous)
+
+**Queue wait:** \(W_c^{\mathrm{Q}} = T_c^{\mathrm{elev}} - T_c^{\mathrm{arr}}\)  
+**In-cab time:** \(W_c^{\mathrm{cab}} = T_c^{\mathrm{dest}} - T_c^{\mathrm{elev}}\)  
+**Total:** \(W_c^{\mathrm{tot}} = T_c^{\mathrm{dest}} - T_c^{\mathrm{arr}} = W_c^{\mathrm{Q}} + W_c^{\mathrm{cab}}\)
 
 ##### Kinematics Model
 
@@ -317,7 +387,7 @@ Assume a segment with direction $\mathrm{dir}_j$, load $L_{k,j}$, and distances 
 -   Car mass: $M_{\mathrm{cab}}$
 -   Effective mass difference: $\Delta M := (M_{\mathrm{cab}} + L_{k,j}) - M_{\mathrm{bal}}$
 -   Direction sign: $s_{\mathrm{dir}_j} = +1$ (up), $-1$ (down)
--   Equivalent moving mass: $M_{\mathrm{eq}}(L) = M_0 + \gamma L$
+-   Equivalent moving mass: $M_{\mathrm{eq}}(L) = M_0 + \gamma L$ (implementation uses $\gamma{=}1$ and $M_0$ equal to the car mass)
 -   Frictional/drag energy per meter: $e_{\mathrm{fric}}$ (J/m)
 -   Motor efficiency: $\eta_{\mathrm{mot}} \in (0,1]$
 -   Gravitational acceleration: $g := 9.81\ \mathrm{m/s^2}$
@@ -344,14 +414,10 @@ $$
 Only the positive part contributes; negative work is dissipated (no regeneration).
 
 **Total energy (including auxiliary systems)**  
-Let the planning horizon be $[0,T_{\mathrm{hor}}]$. Base energy:
-
-$$
-E_{\mathrm{base}} := \sum_{k \in \mathcal K}\ \int_{0}^{T_{\mathrm{hor}}} P_{\mathrm{base}}\,\mathrm{d}t
-= |\mathcal K|\,P_{\mathrm{base}}\,T_{\mathrm{hor}}.
-$$
-
-Motion energy over all segments:
+Auxiliary energy accrues over the actual elapsed operation and idle intervals
+for each elevator, with base power draw $P_{\mathrm{base}}$ integrated over
+travel, dwell, and idle fast-forward durations captured by the event-driven
+simulation. Motion energy over all segments:
 
 $$
 E_{\mathrm{move}} := \sum_{k \in \mathcal K}\ \sum_{\text{segments } j \text{ of } k}\
@@ -361,7 +427,7 @@ $$
 Total:
 
 $$
-E_{\mathrm{total}} := E_{\mathrm{base}} + E_{\mathrm{move}}.
+E_{\mathrm{total}} := E_{\mathrm{aux}} + E_{\mathrm{move}}.
 $$
 
 ##### Decision Variables
@@ -374,10 +440,6 @@ $$
 -   $Q_f(t)$: queue at floor $f$ at time $t$ (event-driven updates).
 
 ---
-
-##### Objective Function
-
-We minimize a weighted sum of total time and energy using a **single time weight** $w_t$:
 
 ##### Objective Function
 
