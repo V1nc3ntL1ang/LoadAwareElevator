@@ -2,15 +2,14 @@ import math
 import os
 import random
 from datetime import datetime
+from pathlib import Path
 from typing import Sequence, Tuple
 
 
-DEFAULT_PLOT_DIR = (
-    "/home/v1nc3nt/WinDesktop/SCUT/作业/优化方法/LoadAwareElevator/results/plots"
-)
-DEFAULT_SUMMARY_DIR = (
-    "/home/v1nc3nt/WinDesktop/SCUT/作业/优化方法/LoadAwareElevator/results/summary"
-)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_RESULTS_DIR = _PROJECT_ROOT / "results"
+DEFAULT_PLOT_DIR = str(_RESULTS_DIR / "plots")
+DEFAULT_SUMMARY_DIR = str(_RESULTS_DIR / "summary")
 
 
 def h2s(hour, minute: int = 0) -> float:
@@ -515,3 +514,14 @@ def log_results(
             )
 
     print(f"[Log Saved] Request summary → {by_request_path}")
+"""
+Common utilities / 通用工具集
+----------------------------
+
+EN: Time conversions, random helpers, logging and plotting utilities used
+across the simulator. Default output directories are resolved relative to the
+project root for portability.
+
+ZH: 提供全局通用的时间换算、随机辅助、日志与绘图工具。默认输出目录基于项目根
+目录解析，保证跨机器的可移植性。
+"""

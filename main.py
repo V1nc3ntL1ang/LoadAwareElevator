@@ -503,3 +503,17 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+"""
+Weekly simulation driver / 每周仿真主入口
+---------------------------------------
+
+EN: Runs a 7-day simulation (Mon–Sun), generating weekday/weekend requests,
+evaluating the GREEDY baseline and the MPC-lite scheduler, logging metrics,
+and optionally plotting aggregate results. Supports optional destination
+predictor loading via ENV var `DEST_MODEL_PATH` and light-weight online
+data export to train the predictor offline.
+
+ZH: 运行一周（周一至周日）的仿真：按工作日/周末生成请求，评估贪婪基线与轻量
+MPC 调度器，输出日志，并可选择绘图。支持通过环境变量 `DEST_MODEL_PATH`
+加载目的地预测模型，并可导出在线数据以离线训练模型。
+"""

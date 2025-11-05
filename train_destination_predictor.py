@@ -1,3 +1,15 @@
+"""
+Destination predictor training CLI / 目的楼层预测器训练命令行
+----------------------------------------------------------
+
+EN: Train the logistic destination predictor either from simulated requests
+for a specific day or over a full week, or from offline JSON logs exported by
+the simulator. Provides evaluation metrics and model persistence.
+
+ZH: 支持基于仿真数据（单日或整周）或离线 JSON 日志训练目的楼层预测模型，
+并输出评估指标与模型存储。
+"""
+
 from __future__ import annotations
 
 import argparse

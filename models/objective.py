@@ -251,3 +251,14 @@ def compute_theoretical_limit(
         wait_lower_bound,
         wait_penalty_value,
     )
+"""
+Objectives and bounds / 目标函数与理论下界
+----------------------------------------
+
+EN: Aggregates passenger time metrics, computes the overall objective with
+waiting penalty, ride time, and energy terms, and estimates an SRPT‑based
+theoretical lower bound consistent with the objective definition.
+
+ZH: 汇总乘客时间指标，计算包含等待惩罚、乘坐时间与能耗项的总目标；
+并给出与该目标一致的基于 SRPT 的理论下界估计。
+"""

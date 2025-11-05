@@ -1,10 +1,13 @@
 """
-Destination floor prediction model powered by sklearn's SGDClassifier.
+Destination floor predictor / 目的楼层预测器
+-------------------------------------------
 
-The model approximates P(dest | origin, time_of_day, weekday) using a
-multinomial logistic regression trained via stochastic gradient descent.
-It provides convenience helpers for MPC integration (top-k predictions,
-distribution dictionaries) and persistence utilities (save/load).
+EN: A multinomial logistic regression (SGDClassifier) approximating
+P(dest | origin, time_of_day, weekday). Exposes helpers for MPC integration
+(top‑k, argmax, distribution dict) and persistence (save/load).
+
+ZH: 使用多项逻辑回归（SGDClassifier）拟合 P(目的楼层 | 起点、时刻、星期)，
+提供 MPC 所需的便捷接口（Top‑K、最大值、分布字典）与模型的保存/加载能力。
 """
 
 from __future__ import annotations

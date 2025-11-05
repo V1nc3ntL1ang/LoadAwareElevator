@@ -1,9 +1,16 @@
 """
-Destination generation model / 目标楼层生成模型.
+Destination generation model / 目标楼层生成模型
+-------------------------------------------------
 
-Provides a non-uniform distribution for selecting destination floors conditioned
-on (weekday, time of day, origin floor). This is used for simulation realism and
-as ground-truth for downstream models.
+EN: Provides a non-uniform distribution P(dest | weekday, time_of_day, origin)
+for sampling destination floors. The distribution is driven by floor tags,
+time buckets, and day-type specific hotspot multipliers defined in
+`models.floor_config`. This serves both (i) simulation realism and
+(ii) ground-truth for the learning models.
+
+ZH: 提供一个非均匀的目的楼层分布 P(dest | 星期、当天时间、起始楼层)，
+其依据 `models.floor_config` 中配置的楼层标签、时间段与热点系数计算，
+用于提升仿真真实性，并作为学习模型的“真实标签”来源。
 """
 
 from __future__ import annotations
@@ -18,14 +25,29 @@ LOBBY_FLOOR = fc.LOBBY_FLOOR
 
 
 def _day_type(weekday: int) -> str:
+    """Return day type from weekday index / 根据星期索引返回日型。
+
+    EN: Monday=0..Sunday=6. Weekend if >=5; else weekday.
+    ZH: 周一=0..周日=6。大于等于5视为周末，否则为工作日。
+    """
     return "weekend" if weekday >= 5 else "weekday"
 
 
 def _origin_key(origin_floor: int) -> str:
+    """Origin category / 起点类别。
+
+    EN: Convert an origin floor into category key used by multipliers.
+    ZH: 将起始楼层映射为用于热点系数的类别键。
+    """
     return "from_lobby" if origin_floor == LOBBY_FLOOR else "from_upper"
 
 
 def _base_weight(origin_key: str, tags: set[str]) -> float:
+    """Category baseline weight / 基础类别权重。
+
+    EN: Start from a category base and sum tag-specific offsets.
+    ZH: 从类别基础权重出发，叠加目标楼层标签对应的偏置。
+    """
     offsets = (
         fc.BASE_OFFSETS_FROM_LOBBY
         if origin_key == "from_lobby"
@@ -45,6 +67,11 @@ def _apply_hotspot_multipliers(
     bucket: str,
     tags: set[str],
 ) -> float:
+    """Apply time-bucket multipliers / 应用时间段热点系数。
+
+    EN: Multiply weight by per-tag factors configured for (day_type, origin_key, bucket).
+    ZH: 按 (日型, 起点类别, 时间段) 组合对各标签施加乘法系数。
+    """
     multipliers = (
         fc.HOTSPOT_MULTIPLIERS.get(day_type, {}).get(origin_key, {}).get(bucket, {})
     )
@@ -58,6 +85,11 @@ def _apply_hotspot_multipliers(
 def _apply_floor_bonus(
     weight: float, *, day_type: str, bucket: str, floor: int
 ) -> float:
+    """Apply floor-specific bonus / 应用特定楼层加成。
+
+    EN: Optional multiplicative bonus for certain floors in some buckets.
+    ZH: 对部分楼层在特定时间段额外乘以加成系数。
+    """
     bonus = fc.FLOOR_SPECIFIC_BONUS.get(day_type, {}).get(bucket, {}).get(floor)
     if bonus is not None:
         weight *= bonus
@@ -74,6 +106,12 @@ def _apply_interactions(
     day_type: str,
     bucket: str,
 ) -> float:
+    """Inter-tag interactions / 标签间交互影响。
+
+    EN: Heuristic scaling capturing plausible social/behavioral patterns
+    (e.g., residential↔amenity flows, nightlife, panorama).
+    ZH: 捕捉更贴近实际的行为模式（如住宅与配套楼层间流动、夜生活、景观层偏好）。
+    """
     if "residential" in origin_tags and "residential" in dest_tags:
         damp = 0.55 if day_type == "weekday" else 0.65
         if bucket in {"night"}:
@@ -105,6 +143,11 @@ def _apply_interactions(
 
 
 def _normalize(weights: list[float]) -> list[float]:
+    """Normalize a list into probabilities / 将权重归一化为概率。
+
+    EN: Uniform fallback when all weights are non-positive.
+    ZH: 若总权重非正，则回退为等概率。
+    """
     total = sum(weights)
     if total <= 0:
         n = len(weights)
@@ -118,7 +161,8 @@ def destination_distribution(
     origin_floor: int,
 ) -> Dict[int, float]:
     """
-    返回楼层→概率 dict，表示 P(dest | weekday, time_s, origin_floor)。
+    EN: Return a dict floor->probability for P(dest | weekday, time_s, origin).
+    ZH: 返回楼层→概率字典，表示 P(dest | 星期、时间、起点楼层)。
     """
     if origin_floor < 1 or origin_floor > NUM_FLOORS:
         raise ValueError("origin_floor out of range.")
@@ -172,7 +216,9 @@ def sample_destination(
     exclude: set[int] | None = None,
 ) -> int:
     """
-    从 P(dest | weekday, time_s, origin_floor) 中采样一个具体的目的楼层。
+    EN: Sample a destination floor from P(dest | weekday, time_s, origin),
+    optionally excluding some floors.
+    ZH: 从条件分布中采样目的楼层，可选排除部分楼层。
     """
     dist = destination_distribution(weekday, time_s, origin_floor)
     if exclude:

@@ -61,3 +61,14 @@ def segment_energy(load, distance, direction="up"):
 def standby_energy(duration):
     """Baseline auxiliary energy proportional to elapsed time / 按时间计算的基础附属能耗。"""
     return cfg.ENERGY_STANDBY_POWER * max(duration, 0.0)
+"""
+Energy model / 能耗模型
+-----------------------
+
+EN: Computes traction and standby energy for elevator motion segments using a
+simple kinematic decomposition (accelerate–cruise–decelerate) without
+regeneration. Parameters taken from `models.config`.
+
+ZH: 基于加速–匀速–减速的分段模型计算牵引与待机能耗（不包含能量回收），
+相关参数取自 `models.config`。
+"""

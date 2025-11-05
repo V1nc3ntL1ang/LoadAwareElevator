@@ -1,22 +1,13 @@
 """
-Lightweight prediction API for MPC integration.
+MPC prediction API / MPC 预测接口
+---------------------------------
 
-This module keeps a process-level singleton of the destination predictor and
-exposes tiny helper functions that MPC can call without caring about the model
-internals. Intended usage:
+EN: Process‑level singleton wrapper around the destination predictor exposing
+small helper functions (distribution, top‑k, argmax) so the MPC code can remain
+model‑agnostic.
 
-    from scheduler.mpc_scheduler.prediction_api import (
-        load_destination_model,
-        predict_dest_top1,
-        predict_dest_distribution,
-        is_ready,
-    )
-
-    load_destination_model("path/to/model.pkl")
-    if is_ready():
-        dest = predict_dest_top1(origin, time_s, weekday)
-
-You can also inject an already-constructed model via set_destination_model().
+ZH: 对目的楼层预测器的进程级单例封装，暴露分布、Top‑K、最大值等小型接口，
+使 MPC 逻辑无需关注具体模型实现。
 """
 
 from __future__ import annotations

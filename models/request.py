@@ -1,3 +1,4 @@
+import math
 import random
 
 from models import config as cfg
@@ -121,13 +122,40 @@ def generate_requests_weekday(
 ):
     """Simulate a full-day demand profile / 生成完整一天的乘梯请求序列。"""
     seed_base = cfg.SIM_RANDOM_SEED + seed_shift
-    total_morning = int(total_requests * cfg.WEEKDAY_PEAK_MORNING_RATIO)
-    total_day = int(total_requests * cfg.WEEKDAY_OFFPEAK_DAY_RATIO)
-    total_evening = int(total_requests * cfg.WEEKDAY_PEAK_EVENING_RATIO)
-    total_night = int(total_requests * cfg.WEEKDAY_OFFPEAK_NIGHT_RATIO)
+
+    ratios = [
+        cfg.WEEKDAY_PEAK_MORNING_RATIO,
+        cfg.WEEKDAY_OFFPEAK_DAY_RATIO,
+        cfg.WEEKDAY_PEAK_EVENING_RATIO,
+        cfg.WEEKDAY_OFFPEAK_NIGHT_RATIO,
+    ]
+    raw_counts = [total_requests * float(r) for r in ratios]
+    allocation = [int(count) for count in raw_counts]
+    remainders = [(raw - base, idx) for idx, (raw, base) in enumerate(zip(raw_counts, allocation))]
+
+    remaining = total_requests - sum(allocation)
+    if remaining > 0:
+        for _, idx in sorted(remainders, reverse=True):
+            if remaining == 0:
+                break
+            allocation[idx] += 1
+            remaining -= 1
+    elif remaining < 0:
+        for _, idx in sorted(remainders):
+            if remaining == 0:
+                break
+            allocation[idx] = max(0, allocation[idx] - 1)
+            remaining += 1
+
+    total_morning, total_day, total_evening, total_night = allocation
+
+    def _scaled_request_count(target: int, intensity: float) -> int:
+        if intensity <= 0:
+            return target
+        return int(math.ceil(target / max(intensity, 1e-9)))
 
     morning = generate_peak_gaussian(
-        num_requests=total_morning,
+        num_requests=_scaled_request_count(total_morning, cfg.WEEKDAY_MORNING_INTENSITY),
         start_time=cfg.h2s(*cfg.WEEKDAY_PEAK_MORNING_START),
         end_time=cfg.h2s(*cfg.WEEKDAY_PEAK_MORNING_END),
         mu_time=cfg.h2s(cfg.WEEKDAY_PEAK_MORNING_MU),
@@ -144,7 +172,7 @@ def generate_requests_weekday(
     )
 
     day = generate_offpeak_uniform(
-        num_requests=total_day,
+        num_requests=_scaled_request_count(total_day, cfg.WEEKDAY_DAY_INTENSITY),
         start_time=cfg.h2s(*cfg.WEEKDAY_OFFPEAK_DAY_START),
         end_time=cfg.h2s(*cfg.WEEKDAY_OFFPEAK_DAY_END),
         intensity=cfg.WEEKDAY_DAY_INTENSITY,
@@ -159,7 +187,7 @@ def generate_requests_weekday(
     )
 
     evening = generate_peak_gaussian(
-        num_requests=total_evening,
+        num_requests=_scaled_request_count(total_evening, cfg.WEEKDAY_EVENING_INTENSITY),
         start_time=cfg.h2s(*cfg.WEEKDAY_PEAK_EVENING_START),
         end_time=cfg.h2s(*cfg.WEEKDAY_PEAK_EVENING_END),
         mu_time=cfg.h2s(cfg.WEEKDAY_PEAK_EVENING_MU),
@@ -176,7 +204,7 @@ def generate_requests_weekday(
     )
 
     night = generate_offpeak_uniform(
-        num_requests=total_night,
+        num_requests=_scaled_request_count(total_night, cfg.WEEKDAY_NIGHT_INTENSITY),
         start_time=cfg.h2s(*cfg.WEEKDAY_OFFPEAK_NIGHT_START),
         end_time=cfg.h2s(*cfg.WEEKDAY_OFFPEAK_NIGHT_END),
         intensity=cfg.WEEKDAY_NIGHT_INTENSITY,

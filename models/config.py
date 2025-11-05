@@ -77,9 +77,9 @@ SIM_TIME_STEP = 1.0  # 时间步长 (s) / integration step
 SIM_RANDOM_SEED = 53  # 随机种子 / random seed
 WEEKDAY_TOTAL_REQUESTS = 5000  # 工作日每日请求总量 / weekday requests per day
 WEEKEND_TOTAL_REQUESTS = 3600  # 周末每日请求总量 / weekend requests per day
-SIM_ENABLE_PLOTS = False  # 是否输出图像 (总开关) / master switch for plot export
-SIM_ENABLE_PLOTS_GLOBAL = False  # 导出全局楼层-时间图 / export per-elevator global plot
-SIM_ENABLE_PLOTS_TIME = False  # 导出时间轴视图 / export per-elevator time-axis plot
+SIM_ENABLE_PLOTS = True  # 是否输出图像 (总开关) / master switch for plot export
+SIM_ENABLE_PLOTS_GLOBAL = True  # 导出全局楼层-时间图 / export per-elevator global plot
+SIM_ENABLE_PLOTS_TIME = True  # 导出时间轴视图 / export per-elevator time-axis plot
 SIM_ENABLE_PLOTS_DISTRIBUTION = True  # 导出等待分布图 / export wait distribution
 SIM_ENABLE_LOG = True  # 是否写入日志 / enable log export
 
